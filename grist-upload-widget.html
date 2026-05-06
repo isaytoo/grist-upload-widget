@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lien fichier – Grist Widget</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;700;800&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f10;
+      --surface: #1a1a1e;
+      --border: #2e2e35;
+      --accent: #e8ff47;
+      --text: #f0f0f0;
+      --muted: #666;
+      --success: #47ffb2;
+      --error: #ff4747;
+      --radius: 10px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 20px;
+      gap: 16px;
+      min-height: 100%;
+    }
+
+    /* ── Header ── */
+    .header {
+      width: 100%; max-width: 520px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .header-icon {
+      width: 36px; height: 36px; background: var(--accent);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .header-text h1 { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
+    .header-text p  { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 1px; }
+
+    /* ── Status ── */
+    .status-bar {
+      width: 100%; max-width: 520px;
+      font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .sdot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .sdot.ok  { background: var(--success); }
+    .sdot.err { background: var(--error); }
+
+    /* ── Card ── */
+    .card {
+      width: 100%; max-width: 520px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+    }
+    .card label {
+      display: block; font-size: 11px; font-family: 'DM Mono', monospace;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;
+    }
+    .card select {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-family: 'DM Mono', monospace;
+      font-size: 13px; padding: 8px 10px; outline: none; appearance: none; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+    }
+    .card select:focus { border-color: var(--accent); }
+    .note { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--muted); margin-top: 6px; }
+
+    /* ── Zone de saisie du lien ── */
+    .link-zone {
+      width: 100%; max-width: 520px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .link-zone label {
+      font-size: 11px; font-family: 'DM Mono', monospace;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px;
+    }
+    .link-row {
+      display: flex; gap: 8px; align-items: stretch;
+    }
+    .link-input {
+      flex: 1; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-family: 'DM Mono', monospace;
+      font-size: 12px; padding: 9px 12px; outline: none;
+      transition: border-color 0.15s;
+    }
+    .link-input:focus { border-color: var(--accent); }
+    .link-input::placeholder { color: var(--muted); }
+
+    .btn-add {
+      background: var(--accent); color: #000; border: none; border-radius: 6px;
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px;
+      padding: 0 16px; cursor: pointer; white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+    .btn-add:hover { opacity: 0.85; }
+
+    /* ── Liste des liens ── */
+    .links-list {
+      width: 100%; max-width: 520px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+
+    .link-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 13px;
+      display: flex; align-items: center; gap: 10px;
+      animation: slideIn 0.18s ease;
+    }
+    @keyframes slideIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+
+    .link-icon {
+      width: 32px; height: 32px; background: rgba(232,255,71,0.1);
+      border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .link-info { flex: 1; min-width: 0; }
+    .link-url {
+      font-size: 12px; font-family: 'DM Mono', monospace;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--accent);
+    }
+    .link-name {
+      font-size: 11px; font-family: 'DM Mono', monospace;
+      color: var(--muted); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .btn-del {
+      background: none; border: none; cursor: pointer; padding: 4px;
+      color: var(--muted); transition: color 0.15s; flex-shrink: 0;
+      border-radius: 4px;
+    }
+    .btn-del:hover { color: var(--error); }
+
+    /* ── Bouton enregistrer ── */
+    .save-btn {
+      width: 100%; max-width: 520px;
+      background: var(--accent); color: #000; font-family: 'Syne', sans-serif;
+      font-weight: 800; font-size: 14px; border: none; border-radius: var(--radius);
+      padding: 13px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .save-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+    .save-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ── Valeur actuelle ── */
+    .current-val {
+      width: 100%; max-width: 520px;
+      background: rgba(71,255,178,0.06); border: 1px solid rgba(71,255,178,0.2);
+      border-radius: var(--radius); padding: 12px 14px; display: none;
+    }
+    .current-val .cv-label { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--success); margin-bottom: 5px; }
+    .current-val .cv-text  { font-size: 12px; font-family: 'DM Mono', monospace; word-break: break-all; color: var(--text); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 18px; font-size: 13px;
+      font-family: 'DM Mono', monospace;
+      transition: transform 0.3s ease; z-index: 100; white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.ok   { border-color: var(--success); color: var(--success); }
+    .toast.err  { border-color: var(--error);   color: var(--error); }
+
+    .empty-hint {
+      width: 100%; max-width: 520px; text-align: center;
+      font-size: 12px; font-family: 'DM Mono', monospace; color: var(--muted);
+      padding: 10px 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-icon">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+    </svg>
+  </div>
+  <div class="header-text">
+    <h1>Liens de fichiers</h1>
+    <p>Collez un lien · Il est enregistré dans Grist</p>
+  </div>
+</div>
+
+<!-- Statut Grist -->
+<div class="status-bar">
+  <div class="sdot" id="sdot"></div>
+  <span id="slabel">Connexion à Grist…</span>
+</div>
+
+<!-- Colonne cible -->
+<div class="card">
+  <label>Colonne cible dans Grist</label>
+  <select id="colSelect"><option value="">— En attente… —</option></select>
+  <p class="note" id="colNote"></p>
+</div>
+
+<!-- Valeur actuelle dans la cellule -->
+<div class="current-val" id="currentVal">
+  <div class="cv-label">📌 Valeur actuelle dans cette cellule</div>
+  <div class="cv-text" id="currentText"></div>
+</div>
+
+<!-- Saisie du lien -->
+<div class="link-zone">
+  <label>Ajouter un lien</label>
+  <div class="link-row">
+    <input class="link-input" id="linkInput"
+      type="url"
+      placeholder="https://drive.google.com/file/… ou tout autre lien" />
+    <button class="btn-add" id="btnAdd">+ Ajouter</button>
+  </div>
+</div>
+
+<!-- Liste des liens à enregistrer -->
+<div class="links-list" id="linksList"></div>
+<div class="empty-hint" id="emptyHint">Aucun lien ajouté pour l'instant</div>
+
+<!-- Bouton enregistrer -->
+<button class="save-btn" id="saveBtn" disabled>Enregistrer dans Grist</button>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// ── State ──────────────────────────────────────────────────────────────────
+let links   = [];   // { url, name }
+let tableId = null;
+let rowId   = null;
+let gristOK = false;
+let currentRecord = null;
+
+// ── Grist ──────────────────────────────────────────────────────────────────
+grist.ready({ requiredAccess: 'full' });
+
+grist.onRecord(async function(record, mappings) {
+  currentRecord = record;
+  if (record) rowId = record.id;
+
+  if (mappings && mappings.tableId && !tableId) {
+    tableId = mappings.tableId;
+  }
+  if (!tableId) {
+    try {
+      const res = await grist.docApi.listTables();
+      if (res && res.tableIds && res.tableIds.length) tableId = res.tableIds[0];
+    } catch(_) {}
+  }
+  if (tableId && !gristOK) await initColumns();
+
+  // Afficher la valeur actuelle de la colonne sélectionnée
+  showCurrentValue();
+});
+
+// Tentative initiale
+setTimeout(async () => {
+  if (!tableId) {
+    try {
+      const res = await grist.docApi.listTables();
+      if (res && res.tableIds && res.tableIds.length) {
+        tableId = res.tableIds[0];
+        await initColumns();
+      }
+    } catch(e) {
+      setStatus(false, 'Mode démo — non connecté à Grist');
+    }
+  }
+}, 800);
+
+async function initColumns() {
+  if (gristOK) return;
+  try {
+    const data = await grist.docApi.fetchTable(tableId);
+    const colIds = Object.keys(data).filter(k => k !== 'manualSort' && k !== 'id');
+    const sel = $('colSelect');
+    if (colIds.length) {
+      sel.innerHTML = colIds.map(c => `<option value="${c}">${c}</option>`).join('');
+      $('colNote').textContent = colIds.length + ' colonne(s) · ' + tableId;
+    } else {
+      sel.innerHTML = '<option value="lien">lien</option>';
+    }
+    setStatus(true, `Connecté · ${tableId}`);
+    gristOK = true;
+    showCurrentValue();
+  } catch(e) {
+    setStatus(false, 'Erreur : ' + e.message);
+  }
+}
+
+// Mise à jour du statut quand on change de colonne
+$('colSelect').addEventListener('change', showCurrentValue);
+
+function showCurrentValue() {
+  const colId = $('colSelect').value;
+  if (!currentRecord || !colId || !currentRecord[colId]) {
+    $('currentVal').style.display = 'none';
+    return;
+  }
+  const val = currentRecord[colId];
+  $('currentText').textContent = val;
+  $('currentVal').style.display = 'block';
+}
+
+function setStatus(ok, msg) {
+  $('sdot').className = 'sdot ' + (ok ? 'ok' : 'err');
+  $('slabel').textContent = msg;
+}
+
+// ── Gestion des liens ──────────────────────────────────────────────────────
+function nameFromUrl(url) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/').filter(Boolean);
+    return parts.length ? decodeURIComponent(parts[parts.length - 1]) : u.hostname;
+  } catch { return url; }
+}
+
+function addLink() {
+  const val = $('linkInput').value.trim();
+  if (!val) return;
+  links.push({ url: val, name: nameFromUrl(val) });
+  $('linkInput').value = '';
+  render();
+  $('saveBtn').disabled = false;
+}
+
+$('btnAdd').addEventListener('click', addLink);
+$('linkInput').addEventListener('keydown', e => { if (e.key === 'Enter') addLink(); });
+
+function removeLink(i) {
+  links.splice(i, 1);
+  render();
+  $('saveBtn').disabled = links.length === 0;
+}
+
+function render() {
+  const list = $('linksList');
+  list.innerHTML = '';
+  $('emptyHint').style.display = links.length ? 'none' : 'block';
+
+  links.forEach((lk, i) => {
+    const el = document.createElement('div');
+    el.className = 'link-item';
+    el.innerHTML = `
+      <div class="link-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8ff47" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+      </div>
+      <div class="link-info">
+        <div class="link-url">${lk.url}</div>
+        <div class="link-name">${lk.name}</div>
+      </div>
+      <button class="btn-del" title="Supprimer" onclick="removeLink(${i})">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    `;
+    list.appendChild(el);
+  });
+}
+
+// ── Enregistrement dans Grist ──────────────────────────────────────────────
+$('saveBtn').addEventListener('click', async () => {
+  if (!links.length) return;
+  const colId = $('colSelect').value;
+  if (!colId) { toast('Sélectionne une colonne cible', 'err'); return; }
+
+  const value = links.map(l => l.url).join('\n');
+
+  if (!gristOK) {
+    toast('Non connecté à Grist', 'err');
+    return;
+  }
+
+  $('saveBtn').disabled = true;
+  try {
+    if (rowId) {
+      await grist.docApi.applyUserActions([['UpdateRecord', tableId, rowId, { [colId]: value }]]);
+      toast(`✓ ${links.length} lien(s) enregistré(s) — ligne #${rowId}`, 'ok');
+    } else {
+      await grist.docApi.applyUserActions([['AddRecord', tableId, null, { [colId]: value }]]);
+      toast('✓ Nouvelle ligne créée', 'ok');
+    }
+    // Afficher la nouvelle valeur
+    $('currentText').textContent = value;
+    $('currentVal').style.display = 'block';
+    // Vider la liste
+    links = [];
+    render();
+  } catch(e) {
+    toast('Erreur Grist : ' + e.message, 'err');
+  }
+  $('saveBtn').disabled = links.length === 0;
+});
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg, type = 'ok') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// Init
+render();
+</script>
+</body>
+</html>
