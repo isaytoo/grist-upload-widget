@@ -36,9 +36,7 @@
       text-align: center;
     }
 
-    .input-group {
-      margin-bottom: 15px;
-    }
+    .input-group { margin-bottom: 15px; }
 
     input[type="file"] { 
       width: 100%; 
@@ -63,41 +61,26 @@
       font-size: 14px;
     }
 
-    button:hover:not(:disabled) {
-      background: #f0ff75;
-      transform: translateY(-1px);
-    }
-
-    button:disabled { 
-      background: #333; 
-      color: #666; 
-      cursor: not-allowed; 
-    }
+    button:hover:not(:disabled) { background: #f0ff75; transform: translateY(-1px); }
+    button:disabled { background: #333; color: #666; cursor: not-allowed; }
 
     .progress-container { 
-      width: 100%; 
-      background: #0f0f10; 
-      height: 10px; 
-      border-radius: 5px; 
-      display: none; 
-      margin: 10px 0;
-      overflow: hidden;
-      border: 1px solid #2e2e35;
+      width: 100%; background: #0f0f10; height: 10px; border-radius: 5px; 
+      display: none; margin: 10px 0; overflow: hidden; border: 1px solid #2e2e35;
     }
 
-    #progressBar { 
-      width: 0%; 
-      height: 100%; 
-      background: #47ffb2; 
-      transition: width 0.3s ease; 
-    }
+    #progressBar { width: 0%; height: 100%; background: #47ffb2; transition: width 0.3s ease; }
 
     #status { 
-      font-size: 12px; 
-      color: #888; 
-      text-align: center; 
-      margin-top: 10px;
-      font-family: monospace;
+      font-size: 12px; color: #888; text-align: center; 
+      margin-top: 10px; font-family: monospace;
+    }
+
+    #debug {
+      font-size: 10px; color: #555; text-align: left;
+      margin-top: 10px; font-family: monospace;
+      background: #0f0f10; padding: 8px; border-radius: 4px;
+      word-break: break-all;
     }
   </style>
 </head>
@@ -116,6 +99,7 @@
   
   <button id="uploadBtn" disabled>Enregistrer dans Grist</button>
   <p id="status">Chargement...</p>
+  <pre id="debug"></pre>
 </div>
 
 <script>
@@ -129,44 +113,54 @@
   const status = document.getElementById('status');
   const progressBar = document.getElementById('progressBar');
   const progressContainer = document.getElementById('progressContainer');
+  const debug = document.getElementById('debug');
 
   let mappedColumn = null;
 
-  // Initialisation avec déclaration du mapping de colonne
+  function log(msg) {
+    debug.innerText += msg + '\n';
+    console.log(msg);
+  }
+
+  function setMappedColumn(col) {
+    mappedColumn = col;
+    if (col) {
+      status.innerText = "✅ Prêt — colonne : " + col;
+      log("✅ mappedColumn = " + col);
+    } else {
+      status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
+    }
+  }
+
   grist.ready({
     requiredAccess: 'full',
     columns: [{ name: 'Lien', title: 'Colonne de destination', type: 'Text' }]
   });
 
-  // onRecord fournit toujours les mappings en second argument
-  // même sans ligne sélectionnée, les mappings arrivent dès que configurés
-  grist.onRecord((record, mappings) => {
-    if (mappings && mappings.Lien) {
-      mappedColumn = mappings.Lien;
-      status.innerText = "✅ Prêt";
-    } else {
-      mappedColumn = null;
-      status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
+  // Méthode 1 : onOptions
+  grist.onOptions((options, interaction) => {
+    log("onOptions: " + JSON.stringify({ options, interaction }));
+    if (interaction && interaction.columns && interaction.columns.Lien) {
+      setMappedColumn(interaction.columns.Lien);
     }
   });
 
-  // Fallback si onRecord ne se déclenche pas (aucune ligne dans la table)
-  setTimeout(() => {
-    if (!mappedColumn) {
-      // Tentative via grist.widgetApi si disponible
-      if (grist.widgetApi && grist.widgetApi.mappings) {
-        const m = grist.widgetApi.mappings;
-        if (m && m.Lien) {
-          mappedColumn = m.Lien;
-          status.innerText = "✅ Prêt";
-          return;
-        }
-      }
-      status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
+  // Méthode 2 : onRecord
+  grist.onRecord((record, mappings) => {
+    log("onRecord mappings: " + JSON.stringify(mappings));
+    if (mappings && mappings.Lien) {
+      setMappedColumn(mappings.Lien);
     }
-  }, 2000);
+  });
 
-  // Activer le bouton uniquement quand un fichier est sélectionné
+  // Méthode 3 : onRecords
+  grist.onRecords((records, mappings) => {
+    log("onRecords mappings: " + JSON.stringify(mappings));
+    if (mappings && mappings.Lien) {
+      setMappedColumn(mappings.Lien);
+    }
+  });
+
   fileInput.addEventListener('change', () => {
     uploadBtn.disabled = !fileInput.files.length;
   });
@@ -175,12 +169,13 @@
     const file = fileInput.files[0];
     if (!file) return alert("Veuillez choisir un fichier d'abord.");
 
-    // Tentative de récupérer le mapping au dernier moment si pas encore dispo
+    // Dernier recours au moment du clic
     if (!mappedColumn) {
       try {
         const m = await grist.getMappings();
-        if (m && m.Lien) mappedColumn = m.Lien;
-      } catch(e) {}
+        log("getMappings: " + JSON.stringify(m));
+        if (m && m.Lien) setMappedColumn(m.Lien);
+      } catch(e) { log("getMappings error: " + e); }
     }
 
     if (!mappedColumn) {
@@ -202,8 +197,7 @@
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
-        const percent = Math.round((e.loaded / e.total) * 100);
-        progressBar.style.width = percent + '%';
+        progressBar.style.width = Math.round((e.loaded / e.total) * 100) + '%';
       }
     };
 
@@ -231,12 +225,11 @@
           }, 3000);
 
         } catch (gristErr) {
-          console.error("Erreur Grist:", gristErr);
+          log("Erreur Grist: " + gristErr.message);
           status.innerText = "❌ Erreur Grist : " + gristErr.message;
           uploadBtn.disabled = false;
         }
       } else {
-        console.error("Erreur Cloudinary:", response);
         status.innerText = "❌ Erreur Cloudinary : " + (response.error ? response.error.message : "Vérifiez votre Preset");
         progressBar.style.backgroundColor = "#ff4747";
         uploadBtn.disabled = false;
