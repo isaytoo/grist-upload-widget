@@ -130,8 +130,20 @@
   const progressBar = document.getElementById('progressBar');
   const progressContainer = document.getElementById('progressContainer');
 
-  // Initialisation API Grist
-  grist.ready({ requiredAccess: 'full' });
+  let mappedColumn = null; // Nom réel de la colonne, résolu via le mapping
+
+  // Initialisation avec déclaration du mapping de colonne
+  grist.ready({
+    requiredAccess: 'full',
+    columns: [{ name: 'Lien', title: 'Colonne de destination', type: 'Text' }]
+  });
+
+  // Récupération du mapping dès que Grist le fournit
+  grist.onOptions((options, interaction) => {
+    if (interaction && interaction.columns && interaction.columns.Lien) {
+      mappedColumn = interaction.columns.Lien;
+    }
+  });
 
   // Activer le bouton uniquement quand un fichier est sélectionné
   fileInput.addEventListener('change', () => {
@@ -141,6 +153,11 @@
   uploadBtn.onclick = async () => {
     const file = fileInput.files[0];
     if (!file) return alert("Veuillez choisir un fichier d'abord.");
+
+    if (!mappedColumn) {
+      status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
+      return;
+    }
 
     uploadBtn.disabled = true;
     progressContainer.style.display = 'block';
@@ -170,9 +187,9 @@
 
         try {
           const tableId = await grist.getSelectedTableId();
-          // Crée un nouvel enregistrement avec l'URL Cloudinary
+          // Utilise le nom réel de la colonne via le mapping
           await grist.docApi.applyUserActions([
-            ['AddRecord', tableId, null, { Lien: fileUrl }]
+            ['AddRecord', tableId, null, { [mappedColumn]: fileUrl }]
           ]);
           
           status.innerText = "✅ Fichier enregistré avec succès !";
