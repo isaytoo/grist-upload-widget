@@ -115,7 +115,7 @@
   </div>
   
   <button id="uploadBtn" disabled>Enregistrer dans Grist</button>
-  <p id="status">Chargement du widget...</p>
+  <p id="status">✅ Prêt</p>
 </div>
 
 <script>
@@ -130,39 +130,21 @@
   const progressBar = document.getElementById('progressBar');
   const progressContainer = document.getElementById('progressContainer');
 
-  let rowId = null;
-  let currentMappings = null;
-
   // Initialisation API Grist
-  grist.ready({
-    requiredAccess: 'full',
-    columns: [{ name: 'Lien', title: 'Colonne de destination', type: 'Text' }]
-  });
+  grist.ready({ requiredAccess: 'full' });
 
-  // Détection de la ligne sélectionnée
-  grist.onRecord((record, mappings) => {
-    rowId = record ? record.id : null;
-    currentMappings = mappings;
-
-    if (!rowId) {
-      status.innerText = "⚠️ Sélectionnez une ligne dans Grist";
-      uploadBtn.disabled = true;
-    } else if (!mappings || !mappings.Lien) {
-      status.innerText = "⚙️ Configurez la colonne 'Lien' (Panel de droite)";
-      uploadBtn.disabled = true;
-    } else {
-      status.innerText = "✅ Prêt pour l'envoi (Ligne #" + rowId + ")";
-      uploadBtn.disabled = false;
-    }
+  // Activer le bouton uniquement quand un fichier est sélectionné
+  fileInput.addEventListener('change', () => {
+    uploadBtn.disabled = !fileInput.files.length;
   });
 
   uploadBtn.onclick = async () => {
     const file = fileInput.files[0];
     if (!file) return alert("Veuillez choisir un fichier d'abord.");
 
-    // Verrouiller l'interface
     uploadBtn.disabled = true;
     progressContainer.style.display = 'block';
+    progressBar.style.backgroundColor = "#47ffb2";
     status.innerText = "Téléchargement vers Cloudinary...";
 
     const formData = new FormData();
@@ -172,7 +154,6 @@
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, true);
 
-    // Gestion de la progression
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
         const percent = Math.round((e.loaded / e.total) * 100);
@@ -189,31 +170,32 @@
 
         try {
           const tableId = await grist.getSelectedTableId();
-          // Mise à jour de la cellule Grist avec l'URL Cloudinary
+          // Crée un nouvel enregistrement avec l'URL Cloudinary
           await grist.docApi.applyUserActions([
-            ['UpdateRecord', tableId, rowId, { [currentMappings.Lien]: fileUrl }]
+            ['AddRecord', tableId, null, { Lien: fileUrl }]
           ]);
           
           status.innerText = "✅ Fichier enregistré avec succès !";
-          fileInput.value = ""; // Reset de l'input
-          progressBar.style.backgroundColor = "#47ffb2";
+          fileInput.value = "";
+          uploadBtn.disabled = true;
+
+          setTimeout(() => { 
+            progressContainer.style.display = 'none'; 
+            progressBar.style.width = '0%';
+            status.innerText = "✅ Prêt";
+          }, 3000);
+
         } catch (gristErr) {
           console.error("Erreur Grist:", gristErr);
           status.innerText = "❌ Erreur Grist : " + gristErr.message;
+          uploadBtn.disabled = false;
         }
       } else {
         console.error("Erreur Cloudinary:", response);
         status.innerText = "❌ Erreur Cloudinary : " + (response.error ? response.error.message : "Vérifiez votre Preset");
         progressBar.style.backgroundColor = "#ff4747";
+        uploadBtn.disabled = false;
       }
-      
-      uploadBtn.disabled = false;
-      setTimeout(() => { 
-        if(status.innerText.includes("succès")) {
-           progressContainer.style.display = 'none'; 
-           progressBar.style.width = '0%';
-        }
-      }, 4000);
     };
 
     xhr.onerror = () => {
