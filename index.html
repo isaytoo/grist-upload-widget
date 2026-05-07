@@ -115,7 +115,7 @@
   </div>
   
   <button id="uploadBtn" disabled>Enregistrer dans Grist</button>
-  <p id="status">✅ Prêt</p>
+  <p id="status">Chargement...</p>
 </div>
 
 <script>
@@ -130,7 +130,7 @@
   const progressBar = document.getElementById('progressBar');
   const progressContainer = document.getElementById('progressContainer');
 
-  let mappedColumn = null; // Nom réel de la colonne, résolu via le mapping
+  let mappedColumn = null;
 
   // Initialisation avec déclaration du mapping de colonne
   grist.ready({
@@ -138,12 +138,33 @@
     columns: [{ name: 'Lien', title: 'Colonne de destination', type: 'Text' }]
   });
 
-  // Récupération du mapping dès que Grist le fournit
-  grist.onOptions((options, interaction) => {
-    if (interaction && interaction.columns && interaction.columns.Lien) {
-      mappedColumn = interaction.columns.Lien;
+  // onRecord fournit toujours les mappings en second argument
+  // même sans ligne sélectionnée, les mappings arrivent dès que configurés
+  grist.onRecord((record, mappings) => {
+    if (mappings && mappings.Lien) {
+      mappedColumn = mappings.Lien;
+      status.innerText = "✅ Prêt";
+    } else {
+      mappedColumn = null;
+      status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
     }
   });
+
+  // Fallback si onRecord ne se déclenche pas (aucune ligne dans la table)
+  setTimeout(() => {
+    if (!mappedColumn) {
+      // Tentative via grist.widgetApi si disponible
+      if (grist.widgetApi && grist.widgetApi.mappings) {
+        const m = grist.widgetApi.mappings;
+        if (m && m.Lien) {
+          mappedColumn = m.Lien;
+          status.innerText = "✅ Prêt";
+          return;
+        }
+      }
+      status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
+    }
+  }, 2000);
 
   // Activer le bouton uniquement quand un fichier est sélectionné
   fileInput.addEventListener('change', () => {
@@ -153,6 +174,14 @@
   uploadBtn.onclick = async () => {
     const file = fileInput.files[0];
     if (!file) return alert("Veuillez choisir un fichier d'abord.");
+
+    // Tentative de récupérer le mapping au dernier moment si pas encore dispo
+    if (!mappedColumn) {
+      try {
+        const m = await grist.getMappings();
+        if (m && m.Lien) mappedColumn = m.Lien;
+      } catch(e) {}
+    }
 
     if (!mappedColumn) {
       status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
@@ -187,7 +216,6 @@
 
         try {
           const tableId = await grist.getSelectedTableId();
-          // Utilise le nom réel de la colonne via le mapping
           await grist.docApi.applyUserActions([
             ['AddRecord', tableId, null, { [mappedColumn]: fileUrl }]
           ]);
