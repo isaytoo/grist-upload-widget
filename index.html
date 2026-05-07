@@ -113,7 +113,7 @@
     columns: [{ name: 'Lien', title: 'Colonne de destination', type: 'Text' }]
   });
 
-  // onRecords se déclenche même quand la table est vide, contrairement à onRecord
+  // onRecords se déclenche même quand la table est vide
   grist.onRecords((records, mappings) => {
     if (mappings && mappings.Lien) {
       mappedColumn = mappings.Lien;
@@ -146,8 +146,9 @@
     formData.append('file', file);
     formData.append('upload_preset', UPLOAD_PRESET);
 
+    // "auto" détecte le bon type : image, video, raw (pdf, docx, etc.)
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, true);
+    xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, true);
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
