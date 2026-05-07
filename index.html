@@ -75,13 +75,6 @@
       font-size: 12px; color: #888; text-align: center; 
       margin-top: 10px; font-family: monospace;
     }
-
-    #debug {
-      font-size: 10px; color: #555; text-align: left;
-      margin-top: 10px; font-family: monospace;
-      background: #0f0f10; padding: 8px; border-radius: 4px;
-      word-break: break-all;
-    }
   </style>
 </head>
 <body>
@@ -99,7 +92,6 @@
   
   <button id="uploadBtn" disabled>Enregistrer dans Grist</button>
   <p id="status">Chargement...</p>
-  <pre id="debug"></pre>
 </div>
 
 <script>
@@ -113,51 +105,22 @@
   const status = document.getElementById('status');
   const progressBar = document.getElementById('progressBar');
   const progressContainer = document.getElementById('progressContainer');
-  const debug = document.getElementById('debug');
 
   let mappedColumn = null;
-
-  function log(msg) {
-    debug.innerText += msg + '\n';
-    console.log(msg);
-  }
-
-  function setMappedColumn(col) {
-    mappedColumn = col;
-    if (col) {
-      status.innerText = "✅ Prêt — colonne : " + col;
-      log("✅ mappedColumn = " + col);
-    } else {
-      status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
-    }
-  }
 
   grist.ready({
     requiredAccess: 'full',
     columns: [{ name: 'Lien', title: 'Colonne de destination', type: 'Text' }]
   });
 
-  // Méthode 1 : onOptions
-  grist.onOptions((options, interaction) => {
-    log("onOptions: " + JSON.stringify({ options, interaction }));
-    if (interaction && interaction.columns && interaction.columns.Lien) {
-      setMappedColumn(interaction.columns.Lien);
-    }
-  });
-
-  // Méthode 2 : onRecord
-  grist.onRecord((record, mappings) => {
-    log("onRecord mappings: " + JSON.stringify(mappings));
-    if (mappings && mappings.Lien) {
-      setMappedColumn(mappings.Lien);
-    }
-  });
-
-  // Méthode 3 : onRecords
+  // onRecords se déclenche même quand la table est vide, contrairement à onRecord
   grist.onRecords((records, mappings) => {
-    log("onRecords mappings: " + JSON.stringify(mappings));
     if (mappings && mappings.Lien) {
-      setMappedColumn(mappings.Lien);
+      mappedColumn = mappings.Lien;
+      status.innerText = "✅ Prêt";
+    } else {
+      mappedColumn = null;
+      status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
     }
   });
 
@@ -168,15 +131,6 @@
   uploadBtn.onclick = async () => {
     const file = fileInput.files[0];
     if (!file) return alert("Veuillez choisir un fichier d'abord.");
-
-    // Dernier recours au moment du clic
-    if (!mappedColumn) {
-      try {
-        const m = await grist.getMappings();
-        log("getMappings: " + JSON.stringify(m));
-        if (m && m.Lien) setMappedColumn(m.Lien);
-      } catch(e) { log("getMappings error: " + e); }
-    }
 
     if (!mappedColumn) {
       status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
@@ -225,7 +179,6 @@
           }, 3000);
 
         } catch (gristErr) {
-          log("Erreur Grist: " + gristErr.message);
           status.innerText = "❌ Erreur Grist : " + gristErr.message;
           uploadBtn.disabled = false;
         }
