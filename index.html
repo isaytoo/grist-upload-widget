@@ -5,10 +5,8 @@
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700&display=swap');
-    
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* === THÈME CLAIR (défaut) === */
     :root {
       --bg-page:    #f5f5f7;
       --bg-card:    #ffffff;
@@ -18,15 +16,17 @@
       --accent:     #007aff;
       --accent-hover: #0066d6;
       --btn-text:   #ffffff;
-      --btn-disabled-bg:  #d1d1d6;
+      --btn-disabled-bg: #d1d1d6;
       --btn-disabled-txt: #8e8e93;
-      --progress-bg:#e5e5ea;
-      --progress-bar:#34c759;
+      --progress-bg: #e5e5ea;
+      --progress-bar: #34c759;
       --input-bg:   #f5f5f7;
       --input-border: #c7c7cc;
+      --danger:     #ff3b30;
+      --warning-bg: #fff8e1;
+      --warning-border: #f0c040;
     }
 
-    /* === THÈME SOMBRE (automatique si OS/Grist en dark) === */
     @media (prefers-color-scheme: dark) {
       :root {
         --bg-page:    #0f0f10;
@@ -37,50 +37,114 @@
         --accent:     #e8ff47;
         --accent-hover: #f0ff75;
         --btn-text:   #000000;
-        --btn-disabled-bg:  #333333;
+        --btn-disabled-bg: #333333;
         --btn-disabled-txt: #666666;
-        --progress-bg:#0f0f10;
-        --progress-bar:#47ffb2;
+        --progress-bg: #0f0f10;
+        --progress-bar: #47ffb2;
         --input-bg:   #0f0f10;
         --input-border: #2e2e35;
+        --warning-bg: #2a2500;
+        --warning-border: #7a6000;
       }
     }
 
-    body { 
-      background: var(--bg-page); 
-      color: var(--text); 
+    body {
+      background: var(--bg-page);
+      color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      padding: 20px; 
-      display: flex; 
-      flex-direction: column; 
-      gap: 15px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
       min-height: 100vh;
     }
 
-    .card { 
-      background: var(--bg-card); 
-      padding: 24px; 
-      border-radius: 12px; 
+    .card {
+      background: var(--bg-card);
+      padding: 20px 24px;
+      border-radius: 12px;
       border: 1px solid var(--border);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-      max-width: 500px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      max-width: 520px;
       margin: 0 auto;
       width: 100%;
     }
 
-    h1 { 
-      font-family: 'Syne', sans-serif; 
-      font-size: 18px; 
-      margin-bottom: 18px; 
-      color: var(--text);
-      text-align: center;
-      letter-spacing: -0.3px;
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
     }
 
-    .input-group { margin-bottom: 16px; }
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 17px;
+      color: var(--text);
+      letter-spacing: -.3px;
+    }
 
-    input[type="file"] { 
-      width: 100%; 
+    .cfg-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      width: auto;
+      transform: none !important;
+    }
+    .cfg-btn:hover { background: var(--border); color: var(--text); }
+
+    /* Provider badge */
+    .provider-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: var(--accent);
+      color: var(--btn-text);
+      margin-bottom: 14px;
+    }
+
+    /* Form fields */
+    .field { margin-bottom: 12px; }
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 9px 11px;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      font-family: ui-monospace, monospace;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field select { font-family: inherit; cursor: pointer; }
+
+    .field-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    input[type="file"] {
+      width: 100%;
       padding: 10px 12px;
       background: var(--input-bg);
       border: 1px dashed var(--input-border);
@@ -88,184 +152,439 @@
       color: var(--text-muted);
       cursor: pointer;
       font-size: 13px;
+      font-family: inherit;
     }
 
-    button { 
-      width: 100%; 
-      background: var(--accent); 
-      border: none; 
-      padding: 14px; 
+    button {
+      width: 100%;
+      background: var(--accent);
+      border: none;
+      padding: 13px;
       font-weight: 600;
-      border-radius: 8px; 
-      cursor: pointer; 
-      transition: background 0.2s ease, transform 0.1s ease;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
       color: var(--btn-text);
       font-size: 14px;
-      letter-spacing: 0.1px;
     }
+    button:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
+    button:active:not(:disabled) { transform: translateY(0); }
+    button:disabled { background: var(--btn-disabled-bg); color: var(--btn-disabled-txt); cursor: not-allowed; transform: none; }
 
-    button:hover:not(:disabled) {
-      background: var(--accent-hover);
-      transform: translateY(-1px);
+    .btn-save {
+      margin-top: 4px;
     }
-
-    button:active:not(:disabled) {
-      transform: translateY(0);
+    .btn-secondary {
+      background: var(--border);
+      color: var(--text);
+      margin-top: 8px;
     }
+    .btn-secondary:hover:not(:disabled) { background: var(--input-border); }
 
-    button:disabled { 
-      background: var(--btn-disabled-bg); 
-      color: var(--btn-disabled-txt); 
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .progress-container { 
+    .progress-container {
       width: 100%;
       background: var(--progress-bg);
-      height: 6px; 
-      border-radius: 3px; 
-      display: none; 
-      margin: 12px 0;
+      height: 6px;
+      border-radius: 3px;
+      display: none;
+      margin: 10px 0;
       overflow: hidden;
       border: 1px solid var(--border);
     }
-
-    #progressBar { 
-      width: 0%; 
-      height: 100%; 
+    #progressBar {
+      width: 0%;
+      height: 100%;
       background: var(--progress-bar);
-      transition: width 0.3s ease;
+      transition: width .3s;
     }
 
-    #status { 
-      font-size: 12px; 
-      color: var(--text-muted); 
-      text-align: center; 
-      margin-top: 12px;
+    #status {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 10px;
       font-family: monospace;
+      min-height: 18px;
     }
+
+    .warning-box {
+      background: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .hidden { display: none !important; }
+    .sep { height: 1px; background: var(--border); margin: 14px 0; }
   </style>
 </head>
 <body>
 
-<div class="card">
-  <h1>Upload de fichier</h1>
-  
-  <div class="input-group">
+<!-- ===== UPLOAD VIEW ===== -->
+<div class="card" id="uploadView">
+  <div class="card-header">
+    <h1>📤 Upload de fichier</h1>
+    <button class="cfg-btn" id="openConfigBtn">⚙ Configurer</button>
+  </div>
+
+  <div class="provider-badge" id="providerBadge">☁️ —</div>
+
+  <div class="field">
     <input type="file" id="fileInput">
   </div>
-  
+
   <div class="progress-container" id="progressContainer">
     <div id="progressBar"></div>
   </div>
-  
+
   <button id="uploadBtn" disabled>Enregistrer dans Grist</button>
-  <p id="status">Chargement...</p>
+  <p id="status">Chargement…</p>
+</div>
+
+<!-- ===== CONFIG VIEW ===== -->
+<div class="card hidden" id="configView">
+  <div class="card-header">
+    <h1>⚙️ Configuration</h1>
+    <button class="cfg-btn" id="closeConfigBtn">✕ Fermer</button>
+  </div>
+
+  <div class="field">
+    <label>Provider de stockage</label>
+    <select id="cfgProvider">
+      <option value="cloudinary">☁️ Cloudinary</option>
+      <option value="supabase">⚡ Supabase Storage</option>
+      <option value="s3">🪣 AWS S3 / compatible</option>
+      <option value="custom">🔧 URL personnalisée</option>
+    </select>
+  </div>
+
+  <div class="sep"></div>
+
+  <!-- Cloudinary fields -->
+  <div id="fields-cloudinary">
+    <div class="field">
+      <label>Cloud Name</label>
+      <input type="text" id="cfg-cloudName" placeholder="ex: dadhciq0z">
+    </div>
+    <div class="field">
+      <label>Upload Preset (Unsigned)</label>
+      <input type="text" id="cfg-uploadPreset" placeholder="ex: grist_widget">
+      <div class="field-hint">Créez un preset <b>Unsigned</b> dans Cloudinary → Settings → Upload.</div>
+    </div>
+  </div>
+
+  <!-- Supabase fields -->
+  <div id="fields-supabase" class="hidden">
+    <div class="field">
+      <label>URL du projet Supabase</label>
+      <input type="text" id="cfg-supabaseUrl" placeholder="https://xxxx.supabase.co">
+    </div>
+    <div class="field">
+      <label>Bucket</label>
+      <input type="text" id="cfg-supabaseBucket" placeholder="ex: uploads">
+    </div>
+    <div class="field">
+      <label>Clé API (anon key)</label>
+      <input type="text" id="cfg-supabaseKey" placeholder="eyJhbGciOi...">
+      <div class="field-hint">Disponible dans Supabase → Settings → API → anon public key.</div>
+    </div>
+  </div>
+
+  <!-- S3 fields -->
+  <div id="fields-s3" class="hidden">
+    <div class="field">
+      <label>Endpoint S3</label>
+      <input type="text" id="cfg-s3Endpoint" placeholder="https://s3.eu-west-1.amazonaws.com">
+      <div class="field-hint">Pour Cloudflare R2, Backblaze B2, MinIO, etc. — utilisez leur endpoint compatible S3.</div>
+    </div>
+    <div class="field">
+      <label>Bucket</label>
+      <input type="text" id="cfg-s3Bucket" placeholder="mon-bucket">
+    </div>
+    <div class="field">
+      <label>Access Key ID</label>
+      <input type="text" id="cfg-s3AccessKey" placeholder="AKIA...">
+    </div>
+    <div class="field">
+      <label>Secret Access Key</label>
+      <input type="password" id="cfg-s3SecretKey" placeholder="••••••••">
+    </div>
+    <div class="warning-box">⚠️ Les clés S3 sont stockées dans les options du widget Grist (visibles par les admins du document). Préférez des clés avec permissions minimales en écriture uniquement.</div>
+  </div>
+
+  <!-- Custom fields -->
+  <div id="fields-custom" class="hidden">
+    <div class="field">
+      <label>URL de l'endpoint POST</label>
+      <input type="text" id="cfg-customUrl" placeholder="https://mon-api.fr/upload">
+      <div class="field-hint">L'endpoint doit accepter un <code>multipart/form-data</code> avec le champ <code>file</code> et retourner un JSON avec une clé <code>url</code> ou <code>secure_url</code> ou <code>Location</code>.</div>
+    </div>
+    <div class="field">
+      <label>Header Authorization (optionnel)</label>
+      <input type="text" id="cfg-customAuth" placeholder="Bearer mon-token">
+    </div>
+    <div class="field">
+      <label>Champ JSON contenant l'URL</label>
+      <input type="text" id="cfg-customUrlField" placeholder="url">
+      <div class="field-hint">Nom de la clé dans la réponse JSON (ex: <code>url</code>, <code>secure_url</code>, <code>link</code>).</div>
+    </div>
+  </div>
+
+  <div class="sep"></div>
+  <button class="btn-save" id="saveConfigBtn">💾 Enregistrer la configuration</button>
+  <button class="btn-secondary" id="cancelConfigBtn">Annuler</button>
 </div>
 
 <script>
-  // --- CONFIGURATION ---
-  const CLOUD_NAME = "dadhciq0z";
-  const UPLOAD_PRESET = "grist_widget";
-  // ---------------------
-
-  const fileInput = document.getElementById('fileInput');
-  const uploadBtn = document.getElementById('uploadBtn');
-  const status = document.getElementById('status');
-  const progressBar = document.getElementById('progressBar');
-  const progressContainer = document.getElementById('progressContainer');
-
+  // ── State ──────────────────────────────────────────────────────
   let mappedColumn = null;
+  let providerCfg  = null; // loaded from grist options
 
+  const PROVIDER_LABELS = {
+    cloudinary: '☁️ Cloudinary',
+    supabase:   '⚡ Supabase',
+    s3:         '🪣 AWS S3',
+    custom:     '🔧 Personnalisé',
+  };
+
+  // ── Grist init ─────────────────────────────────────────────────
   grist.ready({
     requiredAccess: 'full',
     columns: [{ name: 'Lien', title: 'Colonne de destination', type: 'Text' }]
   });
 
-  // onRecords se déclenche même quand la table est vide
+  grist.onOptions((options) => {
+    if (options && options.providerCfg) {
+      providerCfg = options.providerCfg;
+      updateProviderBadge();
+    } else {
+      providerCfg = null;
+      document.getElementById('providerBadge').textContent = '⚙️ Non configuré — cliquez sur Configurer';
+      showConfig();
+    }
+  });
+
   grist.onRecords((records, mappings) => {
     if (mappings && mappings.Lien) {
       mappedColumn = mappings.Lien;
-      status.innerText = "✅ Prêt";
+      setStatus('✅ Prêt');
     } else {
       mappedColumn = null;
-      status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
+      setStatus('⚙️ Configurez la colonne dans le panel de droite.');
     }
   });
 
-  fileInput.addEventListener('change', () => {
-    uploadBtn.disabled = !fileInput.files.length;
+  // ── UI helpers ─────────────────────────────────────────────────
+  function setStatus(msg) {
+    document.getElementById('status').textContent = msg;
+  }
+
+  function updateProviderBadge() {
+    if (!providerCfg) return;
+    document.getElementById('providerBadge').textContent =
+      PROVIDER_LABELS[providerCfg.provider] || providerCfg.provider;
+  }
+
+  function showConfig() {
+    document.getElementById('uploadView').classList.add('hidden');
+    document.getElementById('configView').classList.remove('hidden');
+    loadConfigForm();
+  }
+
+  function hideConfig() {
+    document.getElementById('configView').classList.add('hidden');
+    document.getElementById('uploadView').classList.remove('hidden');
+  }
+
+  function loadConfigForm() {
+    const cfg = providerCfg || {};
+    const provider = cfg.provider || 'cloudinary';
+    document.getElementById('cfgProvider').value = provider;
+    switchProviderFields(provider);
+
+    document.getElementById('cfg-cloudName').value       = cfg.cloudName || '';
+    document.getElementById('cfg-uploadPreset').value    = cfg.uploadPreset || '';
+    document.getElementById('cfg-supabaseUrl').value     = cfg.supabaseUrl || '';
+    document.getElementById('cfg-supabaseBucket').value  = cfg.supabaseBucket || '';
+    document.getElementById('cfg-supabaseKey').value     = cfg.supabaseKey || '';
+    document.getElementById('cfg-s3Endpoint').value      = cfg.s3Endpoint || '';
+    document.getElementById('cfg-s3Bucket').value        = cfg.s3Bucket || '';
+    document.getElementById('cfg-s3AccessKey').value     = cfg.s3AccessKey || '';
+    document.getElementById('cfg-s3SecretKey').value     = cfg.s3SecretKey || '';
+    document.getElementById('cfg-customUrl').value       = cfg.customUrl || '';
+    document.getElementById('cfg-customAuth').value      = cfg.customAuth || '';
+    document.getElementById('cfg-customUrlField').value  = cfg.customUrlField || 'url';
+  }
+
+  function switchProviderFields(provider) {
+    ['cloudinary','supabase','s3','custom'].forEach(p => {
+      document.getElementById('fields-' + p).classList.toggle('hidden', p !== provider);
+    });
+  }
+
+  document.getElementById('cfgProvider').addEventListener('change', function() {
+    switchProviderFields(this.value);
   });
 
-  uploadBtn.onclick = async () => {
-    const file = fileInput.files[0];
-    if (!file) return alert("Veuillez choisir un fichier d'abord.");
+  document.getElementById('openConfigBtn').addEventListener('click', showConfig);
+  document.getElementById('closeConfigBtn').addEventListener('click', hideConfig);
+  document.getElementById('cancelConfigBtn').addEventListener('click', hideConfig);
 
-    if (!mappedColumn) {
-      status.innerText = "⚙️ Configurez la colonne dans le panel de droite.";
-      return;
-    }
+  document.getElementById('saveConfigBtn').addEventListener('click', async () => {
+    const provider = document.getElementById('cfgProvider').value;
+    const cfg = {
+      provider,
+      cloudName:      document.getElementById('cfg-cloudName').value.trim(),
+      uploadPreset:   document.getElementById('cfg-uploadPreset').value.trim(),
+      supabaseUrl:    document.getElementById('cfg-supabaseUrl').value.trim(),
+      supabaseBucket: document.getElementById('cfg-supabaseBucket').value.trim(),
+      supabaseKey:    document.getElementById('cfg-supabaseKey').value.trim(),
+      s3Endpoint:     document.getElementById('cfg-s3Endpoint').value.trim(),
+      s3Bucket:       document.getElementById('cfg-s3Bucket').value.trim(),
+      s3AccessKey:    document.getElementById('cfg-s3AccessKey').value.trim(),
+      s3SecretKey:    document.getElementById('cfg-s3SecretKey').value.trim(),
+      customUrl:      document.getElementById('cfg-customUrl').value.trim(),
+      customAuth:     document.getElementById('cfg-customAuth').value.trim(),
+      customUrlField: document.getElementById('cfg-customUrlField').value.trim() || 'url',
+    };
+    await grist.setOption('providerCfg', cfg);
+    providerCfg = cfg;
+    updateProviderBadge();
+    hideConfig();
+    setStatus('✅ Configuration enregistrée !');
+  });
 
-    uploadBtn.disabled = true;
+  // ── File input ────────────────────────────────────────────────
+  document.getElementById('fileInput').addEventListener('change', function() {
+    document.getElementById('uploadBtn').disabled = !this.files.length;
+  });
+
+  // ── Upload logic ──────────────────────────────────────────────
+  document.getElementById('uploadBtn').onclick = async () => {
+    const file = document.getElementById('fileInput').files[0];
+    if (!file) return;
+    if (!mappedColumn) { setStatus('⚙️ Configurez la colonne dans le panel de droite.'); return; }
+    if (!providerCfg)  { setStatus('⚙️ Configurez le provider de stockage.'); showConfig(); return; }
+
+    document.getElementById('uploadBtn').disabled = true;
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
     progressContainer.style.display = 'block';
     progressBar.style.backgroundColor = 'var(--progress-bar)';
-    status.innerText = "Téléchargement vers Cloudinary...";
+    progressBar.style.width = '0%';
+    setStatus('⬆️ Upload en cours…');
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', UPLOAD_PRESET);
+    try {
+      const fileUrl = await uploadFile(file, (pct) => {
+        progressBar.style.width = pct + '%';
+      });
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, true);
+      setStatus('💾 Enregistrement dans Grist…');
+      const tableId = await grist.getSelectedTableId();
+      await grist.docApi.applyUserActions([
+        ['AddRecord', tableId, null, { [mappedColumn]: fileUrl }]
+      ]);
 
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        progressBar.style.width = Math.round((e.loaded / e.total) * 100) + '%';
-      }
-    };
+      setStatus('✅ Fichier enregistré !');
+      document.getElementById('fileInput').value = '';
+      document.getElementById('uploadBtn').disabled = true;
+      setTimeout(() => {
+        progressContainer.style.display = 'none';
+        progressBar.style.width = '0%';
+        setStatus('✅ Prêt');
+      }, 3000);
 
-    xhr.onload = async () => {
-      const response = JSON.parse(xhr.responseText);
-      
-      if (xhr.status >= 200 && xhr.status < 300) {
-        const fileUrl = response.secure_url;
-        status.innerText = "💾 Enregistrement dans Grist...";
-
-        try {
-          const tableId = await grist.getSelectedTableId();
-          await grist.docApi.applyUserActions([
-            ['AddRecord', tableId, null, { [mappedColumn]: fileUrl }]
-          ]);
-          
-          status.innerText = "✅ Fichier enregistré avec succès !";
-          fileInput.value = "";
-          uploadBtn.disabled = true;
-
-          setTimeout(() => { 
-            progressContainer.style.display = 'none'; 
-            progressBar.style.width = '0%';
-            status.innerText = "✅ Prêt";
-          }, 3000);
-
-        } catch (gristErr) {
-          status.innerText = "❌ Erreur Grist : " + gristErr.message;
-          uploadBtn.disabled = false;
-        }
-      } else {
-        status.innerText = "❌ Erreur Cloudinary : " + (response.error ? response.error.message : "Vérifiez votre Preset");
-        progressBar.style.backgroundColor = '#ff3b30';
-        uploadBtn.disabled = false;
-      }
-    };
-
-    xhr.onerror = () => {
-      status.innerText = "❌ Erreur réseau ou blocage CORS.";
-      uploadBtn.disabled = false;
-    };
-
-    xhr.send(formData);
+    } catch (err) {
+      setStatus('❌ ' + err.message);
+      progressBar.style.backgroundColor = 'var(--danger)';
+      document.getElementById('uploadBtn').disabled = false;
+    }
   };
+
+  // ── Provider upload implementations ──────────────────────────
+  function uploadFile(file, onProgress) {
+    const p = providerCfg.provider;
+    if (p === 'cloudinary') return uploadCloudinary(file, onProgress);
+    if (p === 'supabase')   return uploadSupabase(file, onProgress);
+    if (p === 's3')         return uploadS3(file, onProgress);
+    if (p === 'custom')     return uploadCustom(file, onProgress);
+    throw new Error('Provider inconnu : ' + p);
+  }
+
+  function xhrUpload(method, url, headers, body, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open(method, url, true);
+      Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
+      xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
+      xhr.onerror = () => reject(new Error('Erreur réseau ou blocage CORS.'));
+      xhr.send(body);
+    });
+  }
+
+  async function uploadCloudinary(file, onProgress) {
+    const { cloudName, uploadPreset } = providerCfg;
+    if (!cloudName || !uploadPreset) throw new Error('Cloudinary : Cloud Name et Upload Preset requis.');
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', uploadPreset);
+    const { status, text } = await xhrUpload('POST',
+      `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
+      {}, fd, onProgress);
+    const res = JSON.parse(text);
+    if (status < 200 || status >= 300) throw new Error('Cloudinary : ' + (res.error?.message || 'Erreur ' + status));
+    return res.secure_url;
+  }
+
+  async function uploadSupabase(file, onProgress) {
+    const { supabaseUrl, supabaseBucket, supabaseKey } = providerCfg;
+    if (!supabaseUrl || !supabaseBucket || !supabaseKey) throw new Error('Supabase : URL, Bucket et Clé API requis.');
+    const path = Date.now() + '_' + file.name;
+    const url = `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/${supabaseBucket}/${path}`;
+    const { status, text } = await xhrUpload('POST', url,
+      { 'Authorization': 'Bearer ' + supabaseKey, 'Content-Type': file.type },
+      file, onProgress);
+    if (status < 200 || status >= 300) {
+      const res = JSON.parse(text); throw new Error('Supabase : ' + (res.error || 'Erreur ' + status));
+    }
+    return `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/${supabaseBucket}/${path}`;
+  }
+
+  async function uploadS3(file, onProgress) {
+    const { s3Endpoint, s3Bucket } = providerCfg;
+    if (!s3Endpoint || !s3Bucket) throw new Error('S3 : Endpoint et Bucket requis.');
+    const path = Date.now() + '_' + file.name;
+    const url = `${s3Endpoint.replace(/\/$/, '')}/${s3Bucket}/${path}`;
+    const { status } = await xhrUpload('PUT', url,
+      { 'Content-Type': file.type },
+      file, onProgress);
+    if (status < 200 || status >= 300) throw new Error('S3 : Erreur ' + status + '. Vérifiez les permissions du bucket.');
+    return url;
+  }
+
+  async function uploadCustom(file, onProgress) {
+    const { customUrl, customAuth, customUrlField } = providerCfg;
+    if (!customUrl) throw new Error('URL personnalisée requise.');
+    const fd = new FormData();
+    fd.append('file', file);
+    const headers = {};
+    if (customAuth) headers['Authorization'] = customAuth;
+    const { status, text } = await xhrUpload('POST', customUrl, headers, fd, onProgress);
+    if (status < 200 || status >= 300) throw new Error('Erreur upload : ' + status);
+    try {
+      const res = JSON.parse(text);
+      const field = customUrlField || 'url';
+      const fileUrl = res[field] || res.url || res.secure_url || res.Location;
+      if (!fileUrl) throw new Error('Champ "' + field + '" introuvable dans la réponse JSON.');
+      return fileUrl;
+    } catch(e) {
+      throw new Error('Réponse JSON invalide : ' + e.message);
+    }
+  }
 </script>
 
 </body>
