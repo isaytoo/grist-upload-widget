@@ -2,6 +2,9 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700&display=swap');
@@ -257,6 +260,7 @@
       <option value="cloudinary">☁️ Cloudinary</option>
       <option value="supabase">⚡ Supabase Storage</option>
       <option value="s3">🪣 AWS S3 / compatible</option>
+      <option value="nextcloud">🗂️ Nextcloud</option>
       <option value="custom">🔧 URL personnalisée</option>
     </select>
   </div>
@@ -315,6 +319,29 @@
     <div class="warning-box">⚠️ Les clés S3 sont stockées dans les options du widget Grist (visibles par les admins du document). Préférez des clés avec permissions minimales en écriture uniquement.</div>
   </div>
 
+  <!-- Nextcloud fields -->
+  <div id="fields-nextcloud" class="hidden">
+    <div class="field">
+      <label>URL Nextcloud</label>
+      <input type="text" id="cfg-ncUrl" placeholder="https://nextcloud.exemple.fr">
+    </div>
+    <div class="field">
+      <label>Nom d'utilisateur</label>
+      <input type="text" id="cfg-ncUsername" placeholder="votre-identifiant">
+    </div>
+    <div class="field">
+      <label>App Token (mot de passe d'application)</label>
+      <input type="password" id="cfg-ncToken" placeholder="xxxx-xxxx-xxxx-xxxx-xxxx">
+      <div class="field-hint">Créez un token dans Nextcloud → Paramètres → Sécurité → Mots de passe d'application.</div>
+    </div>
+    <div class="field">
+      <label>Dossier de destination (optionnel)</label>
+      <input type="text" id="cfg-ncFolder" placeholder="GristUploads">
+      <div class="field-hint">Créé automatiquement si absent. Défaut : <code>GristUploads</code>.</div>
+    </div>
+    <div class="warning-box">⚠️ Les identifiants sont stockés dans les options du widget Grist (visibles par les admins du document). Utilisez un App Token plutôt que votre mot de passe principal.</div>
+  </div>
+
   <!-- Custom fields -->
   <div id="fields-custom" class="hidden">
     <div class="field">
@@ -347,6 +374,7 @@
     cloudinary: '☁️ Cloudinary',
     supabase:   '⚡ Supabase',
     s3:         '🪣 AWS S3',
+    nextcloud:  '🗂️ Nextcloud',
     custom:     '🔧 Personnalisé',
   };
 
@@ -414,13 +442,17 @@
     document.getElementById('cfg-s3Bucket').value        = cfg.s3Bucket || '';
     document.getElementById('cfg-s3AccessKey').value     = cfg.s3AccessKey || '';
     document.getElementById('cfg-s3SecretKey').value     = cfg.s3SecretKey || '';
-    document.getElementById('cfg-customUrl').value       = cfg.customUrl || '';
-    document.getElementById('cfg-customAuth').value      = cfg.customAuth || '';
-    document.getElementById('cfg-customUrlField').value  = cfg.customUrlField || 'url';
+    document.getElementById('cfg-ncUrl').value            = cfg.ncUrl || '';
+    document.getElementById('cfg-ncUsername').value       = cfg.ncUsername || '';
+    document.getElementById('cfg-ncToken').value          = cfg.ncToken || '';
+    document.getElementById('cfg-ncFolder').value         = cfg.ncFolder || '';
+    document.getElementById('cfg-customUrl').value        = cfg.customUrl || '';
+    document.getElementById('cfg-customAuth').value       = cfg.customAuth || '';
+    document.getElementById('cfg-customUrlField').value   = cfg.customUrlField || 'url';
   }
 
   function switchProviderFields(provider) {
-    ['cloudinary','supabase','s3','custom'].forEach(p => {
+    ['cloudinary','supabase','s3','nextcloud','custom'].forEach(p => {
       document.getElementById('fields-' + p).classList.toggle('hidden', p !== provider);
     });
   }
@@ -446,6 +478,10 @@
       s3Bucket:       document.getElementById('cfg-s3Bucket').value.trim(),
       s3AccessKey:    document.getElementById('cfg-s3AccessKey').value.trim(),
       s3SecretKey:    document.getElementById('cfg-s3SecretKey').value.trim(),
+      ncUrl:          document.getElementById('cfg-ncUrl').value.trim(),
+      ncUsername:     document.getElementById('cfg-ncUsername').value.trim(),
+      ncToken:        document.getElementById('cfg-ncToken').value.trim(),
+      ncFolder:       document.getElementById('cfg-ncFolder').value.trim(),
       customUrl:      document.getElementById('cfg-customUrl').value.trim(),
       customAuth:     document.getElementById('cfg-customAuth').value.trim(),
       customUrlField: document.getElementById('cfg-customUrlField').value.trim() || 'url',
@@ -510,6 +546,7 @@
     if (p === 'cloudinary') return uploadCloudinary(file, onProgress);
     if (p === 'supabase')   return uploadSupabase(file, onProgress);
     if (p === 's3')         return uploadS3(file, onProgress);
+    if (p === 'nextcloud')  return uploadNextcloud(file, onProgress);
     if (p === 'custom')     return uploadCustom(file, onProgress);
     throw new Error('Provider inconnu : ' + p);
   }
@@ -564,6 +601,46 @@
       file, onProgress);
     if (status < 200 || status >= 300) throw new Error('S3 : Erreur ' + status + '. Vérifiez les permissions du bucket.');
     return url;
+  }
+
+  async function uploadNextcloud(file, onProgress) {
+    const { ncUrl, ncUsername, ncToken, ncFolder } = providerCfg;
+    if (!ncUrl || !ncUsername || !ncToken) throw new Error('Nextcloud : URL, utilisateur et App Token requis.');
+
+    const base = ncUrl.replace(/\/$/, '');
+    const folder = (ncFolder || 'GristUploads').replace(/^\/|\/$/g, '');
+    const filename = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const auth = btoa(ncUsername + ':' + ncToken);
+    const davBase = base + '/remote.php/dav/files/' + encodeURIComponent(ncUsername);
+    const filePath = '/' + folder + '/' + filename;
+
+    // Créer le dossier si absent (erreur 405 = déjà existe, on ignore)
+    try {
+      await xhrUpload('MKCOL', davBase + '/' + folder, { 'Authorization': 'Basic ' + auth }, null, () => {});
+    } catch (_) {}
+
+    // Upload du fichier via WebDAV PUT
+    const { status } = await xhrUpload('PUT', davBase + filePath,
+      { 'Authorization': 'Basic ' + auth, 'Content-Type': file.type },
+      file, onProgress);
+    if (status < 200 || status >= 300) throw new Error('Nextcloud WebDAV : Erreur ' + status + '. Vérifiez l\'URL, l\'identifiant et le token.');
+
+    // Création d'un lien de partage public via l'OCS API
+    const fd = new FormData();
+    fd.append('path', filePath);
+    fd.append('shareType', '3'); // 3 = lien public
+    fd.append('permissions', '1'); // 1 = lecture seule
+    const { status: sStatus, text: sText } = await xhrUpload('POST',
+      base + '/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json',
+      { 'Authorization': 'Basic ' + auth, 'OCS-APIRequest': 'true' },
+      fd, () => {});
+    if (sStatus < 200 || sStatus >= 300) throw new Error('Nextcloud Share API : Erreur ' + sStatus);
+
+    const res = JSON.parse(sText);
+    const token = res?.ocs?.data?.token;
+    if (!token) throw new Error('Nextcloud : token de partage introuvable dans la réponse.');
+
+    return base + '/s/' + token + '/download';
   }
 
   async function uploadCustom(file, onProgress) {
